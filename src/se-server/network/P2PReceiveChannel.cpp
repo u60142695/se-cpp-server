@@ -43,18 +43,18 @@ void P2PReceiveChannel::ReceiveThread()
     while (m_bReceiveThreadContinue)
     {
         uint32_t recvSize = 0;
-        if (SteamNetworking()->IsP2PPacketAvailable(&recvSize, m_lChannelId))
+        if (SteamGameServerNetworking()->IsP2PPacketAvailable(&recvSize, m_lChannelId))
         {
-            sLog->Info("P2P Packet available");
+            sLog->Info("P2P Packet (Game Server) available");
         }
 
         // process p2p packet through steam
-        int lReceivedMessages = SteamNetworkingMessages()->ReceiveMessagesOnChannel(m_lChannelId, m_pReceiveMessagesBuffer, MAX_MESSAGES_PER_TICK);
+        /*int lReceivedMessages = SteamGameServerNetworkingMessages()->ReceiveMessagesOnChannel(m_lChannelId, m_pReceiveMessagesBuffer, MAX_MESSAGES_PER_TICK);
 
         if (lReceivedMessages > 0)
         {
             sLog->Info("Received %d P2P messages on channel %d", lReceivedMessages, m_lChannelId);
-        }
+        }*/
 
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }

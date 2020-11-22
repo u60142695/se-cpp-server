@@ -81,10 +81,10 @@ bool NetworkInterface::Initialize()
     SteamGameServer()->SetProduct("Space Engineers");
     SteamGameServer()->SetGameDescription("Space Engineers");
     SteamGameServer()->SetDedicatedServer(true);
-    SteamGameServer()->SetServerName("sylar dev server");
-    SteamGameServer()->SetMapName("noname");
+    SteamGameServer()->SetServerName("Development Server");
+    SteamGameServer()->SetMapName("DevMap0.1");
     SteamGameServer()->SetGameTags("groupId0 version1196019 datahashshfAewLc3toqKgW0hnL+PVd+UoxH8= mods0 gamemodeS1-1-1-1 view3000");
-    SteamGameServer()->SetMaxPlayerCount(32);
+    SteamGameServer()->SetMaxPlayerCount(7);
 
     sLog->Info("Network Layer initialized.");
 
@@ -147,6 +147,10 @@ bool NetworkInterface::Start()
     std::string strPublicIP = NetworkUtility::IPIntegerToString(SteamGameServer()->GetPublicIP().m_unIPv4, true);
     sLog->Info("Public IP is %s - Steam ID: %llu", strPublicIP.c_str(), SteamGameServer()->GetSteamID().ConvertToUint64());
     sLog->Info("Connected to Steam!");
+
+    // Create the Lobby.
+    SteamAPICall_t hSteamAPICall = SteamMatchmaking()->CreateLobby(k_ELobbyTypePublic, 7);
+    m_LobbyCreatedCallResult.Set(hSteamAPICall, this, &NetworkInterface::OnLobbyCreated);
 
     return true;
 }
@@ -254,7 +258,7 @@ void NetworkInterface::UDPReceiveThread()
 
 void NetworkInterface::OnP2PSessionRequest(P2PSessionRequest_t* pData)
 {
-    sLog->Info("P2P Session Request received");
+    sLog->Info("P2P Session Request received from %llu", pData->m_steamIDRemote.ConvertToUint64());
 }
 
 void NetworkInterface::OnP2PSessionConnectFail(P2PSessionConnectFail_t* pData)
@@ -280,4 +284,38 @@ void NetworkInterface::OnGSClientGroupStatus(GSClientGroupStatus_t* pData)
 void NetworkInterface::OnGSClientKick(GSClientKick_t* pData)
 {
     sLog->Info("GS client kick");
+}
+
+void NetworkInterface::OnLobbyChatUpdate(LobbyChatUpdate_t *pParam)
+{
+    sLog->Info("lobby chat update");
+}
+
+void NetworkInterface::OnLobbyChatMsg(LobbyChatMsg_t *pParam)
+{
+    sLog->Info("lobby chat message");
+}
+
+void NetworkInterface::OnLobbyCreated(LobbyCreated_t *pCallback, bool bIOFailure)
+{
+    sLog->Info("Lobby created %d", pCallback->m_eResult);
+
+    SteamMatchmaking()->SetLobbyData(CSteamID(pCallback->m_ulSteamIDLobby), "world", "sylardev");
+    SteamMatchmaking()->SetLobbyData(CSteamID(pCallback->m_ulSteamIDLobby), "gameMode", "1");
+    SteamMatchmaking()->SetLobbyData(CSteamID(pCallback->m_ulSteamIDLobby), "worldSize", "13168184");
+    SteamMatchmaking()->SetLobbyData(CSteamID(pCallback->m_ulSteamIDLobby), "appVersion", "1.196.019");
+    SteamMatchmaking()->SetLobbyData(CSteamID(pCallback->m_ulSteamIDLobby), "dataHash", "shfAewLc3toqKgW0hnL+PVd+UoxH8=");
+    SteamMatchmaking()->SetLobbyData(CSteamID(pCallback->m_ulSteamIDLobby), "inventoryMultiplier", "1");
+    SteamMatchmaking()->SetLobbyData(CSteamID(pCallback->m_ulSteamIDLobby), "blocksInventoryMultiplier", "1");
+    SteamMatchmaking()->SetLobbyData(CSteamID(pCallback->m_ulSteamIDLobby), "assemblerMultiplier", "1");
+    SteamMatchmaking()->SetLobbyData(CSteamID(pCallback->m_ulSteamIDLobby), "refineryMultiplier", "1");
+    SteamMatchmaking()->SetLobbyData(CSteamID(pCallback->m_ulSteamIDLobby), "welderMultiplier", "1");
+    SteamMatchmaking()->SetLobbyData(CSteamID(pCallback->m_ulSteamIDLobby), "grinderMultiplier", "1");
+    SteamMatchmaking()->SetLobbyData(CSteamID(pCallback->m_ulSteamIDLobby), "mods", "0");
+    SteamMatchmaking()->SetLobbyData(CSteamID(pCallback->m_ulSteamIDLobby), "view", "3000");
+    SteamMatchmaking()->SetLobbyData(CSteamID(pCallback->m_ulSteamIDLobby), "scenario", "False");
+
+    SteamMatchmaking()->SetLobbyData(CSteamID(pCallback->m_ulSteamIDLobby), "host_steamId", std::to_string(SteamGameServer()->GetSteamID().ConvertToUint64()).c_str());
+
+    //SteamMatchmaking()->SetLobbyGameServer(CSteamID(pCallback->m_ulSteamIDLobby), 3232300643, 27016, SteamGameServer()->GetSteamID());
 }

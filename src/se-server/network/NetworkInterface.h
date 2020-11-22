@@ -27,6 +27,7 @@ private:
     void            SteamCallbackThread();
     void            UDPReceiveThread();
 private:
+    // Callbacks
     STEAM_CALLBACK(NetworkInterface, OnP2PSessionRequest, P2PSessionRequest_t);
     STEAM_CALLBACK(NetworkInterface, OnP2PSessionConnectFail, P2PSessionConnectFail_t);
 
@@ -34,6 +35,13 @@ private:
     STEAM_CALLBACK(NetworkInterface, OnGSClientDeny, GSClientDeny_t);
     STEAM_CALLBACK(NetworkInterface, OnGSClientGroupStatus, GSClientGroupStatus_t);
     STEAM_CALLBACK(NetworkInterface, OnGSClientKick, GSClientKick_t);
+
+    STEAM_CALLBACK(NetworkInterface, OnLobbyChatUpdate, LobbyChatUpdate_t);
+    STEAM_CALLBACK(NetworkInterface, OnLobbyChatMsg, LobbyChatMsg_t);
+
+    // Call Results
+    void OnLobbyCreated(LobbyCreated_t* pCallback, bool bIOFailure);
+    CCallResult<NetworkInterface, LobbyCreated_t> m_LobbyCreatedCallResult;
 private:
     bool                m_bInitialized = false;
     std::thread*        m_pSteamCallbackThread = nullptr;
