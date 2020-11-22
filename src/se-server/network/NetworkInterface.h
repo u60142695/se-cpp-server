@@ -7,6 +7,11 @@
 #include <string>
 #include <thread>
 
+#if WIN32
+#else
+#pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
+
 class NetworkInterface
 {
 public:

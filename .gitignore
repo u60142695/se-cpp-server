@@ -1,2 +1,10 @@
 cmake_vs2019_x64
 build/
+CMakeFiles/
+CMakeCache.txt
+compile_commands.json
+Makefile
+cmake_install.cmake
+nbproject/private
+cmake-build-*
+.idea

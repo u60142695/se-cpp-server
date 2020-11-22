@@ -5,6 +5,10 @@
 
 #if WIN32
 #include <WinSock2.h>
+#else
+#include <fcntl.h>
+#include <sys/socket.h>
+#include <unistd.h>
 #endif
 
 NetworkInterface* sNetworkInterface = new NetworkInterface();
@@ -36,6 +40,7 @@ bool NetworkInterface::Initialize()
     }
 
     // Set Non Blocking
+#if WIN32
     u_long lMode = 1;
     if (ioctlsocket(m_hUDPSocket, FIONBIO, &lMode) == SOCKET_ERROR)
     {
@@ -43,6 +48,9 @@ bool NetworkInterface::Initialize()
         closesocket(m_hUDPSocket);
         return false;
     }
+#else
+    fcntl(m_hUDPSocket, F_SETFL, O_NONBLOCK);
+#endif
 
     sockaddr_in addr;
     addr.sin_addr.s_addr = INADDR_ANY;
@@ -52,7 +60,11 @@ bool NetworkInterface::Initialize()
     if (bind(m_hUDPSocket, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0)
     {
         sLog->Error("Failed to bind UDP Socket!");
+#if WIN32
         closesocket(m_hUDPSocket);
+#else
+        close(m_hUDPSocket);
+#endif
         return false;
     }
 
@@ -87,7 +99,11 @@ void NetworkInterface::Shutdown()
 
         SteamGameServer_Shutdown();
 
+#if WIN32
         closesocket(m_hUDPSocket);
+#else
+        close(m_hUDPSocket);
+#endif
     }
 }
 
@@ -184,7 +200,11 @@ void NetworkInterface::UDPReceiveThread()
     while (m_bUDPReceiveThreadContinue)
     {
         sockaddr_in from;
+#if WIN32
         int fromlen = sizeof(from);
+#else
+        socklen_t fromlen = sizeof(from);
+#endif
 
         int recv = recvfrom(m_hUDPSocket, m_aUDPBuffer, 4096, 0, reinterpret_cast<sockaddr*>(&from), &fromlen);
 
@@ -193,10 +213,10 @@ void NetworkInterface::UDPReceiveThread()
             // if this packet starts with 0xFFFFFFFF, forward it to Steam interface.
             if (recv > 4 && *((uint32_t*)m_aUDPBuffer) == 0xFFFFFFFF)
             {
-                sLog->Info("Forwarding Steam Packet from %s:%d size = %d", NetworkUtility::IPIntegerToString(from.sin_addr.s_addr).c_str(), from.sin_port, recv);
+                sLog->Info("Forwarding Steam Packet from %s:%d size = %d", NetworkUtility::IPIntegerToString(ntohl(from.sin_addr.s_addr)).c_str(), ntohs(from.sin_port), recv);
                 NetworkUtility::HexDump(m_aUDPBuffer, recv);
 
-                SteamGameServer()->HandleIncomingPacket(m_aUDPBuffer, recv, from.sin_addr.s_addr, from.sin_port);
+                SteamGameServer()->HandleIncomingPacket(m_aUDPBuffer, recv, ntohl(from.sin_addr.s_addr), ntohs(from.sin_port));
 
                 // Send Packets that Steam wants to send in this frame.
                 char sendBuffer[16 * 1024] = { 0 };
@@ -205,15 +225,13 @@ void NetworkInterface::UDPReceiveThread()
                 uint16_t sendPort = 0;
                 while ((sendSize = SteamGameServer()->GetNextOutgoingPacket(sendBuffer, 16 * 1024, &sendIP, &sendPort)) != 0)
                 {
-                    std::string strSendIP = NetworkUtility::IPIntegerToString(sendIP).c_str();
-
-                    sLog->Info("Found Steam Packet to forward to %x:%d size=%d", ntohl(sendIP), sendPort, sendSize);
+                    sLog->Info("Found Steam Packet to forward to %s:%d size=%d", NetworkUtility::IPIntegerToString(sendIP).c_str(), sendPort, sendSize);
                     NetworkUtility::HexDump(sendBuffer, sendSize);
 
                     sockaddr_in dst;
                     dst.sin_family = AF_INET;
-                    dst.sin_addr.s_addr = sendIP;
-                    dst.sin_port = sendPort;
+                    dst.sin_addr.s_addr = htonl(sendIP);
+                    dst.sin_port = htons(sendPort);
 
                     int ret = sendto(m_hUDPSocket, sendBuffer, sendSize, 0, reinterpret_cast<const sockaddr*>(&dst), sizeof(dst));
 

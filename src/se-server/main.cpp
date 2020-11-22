@@ -53,7 +53,9 @@ int main(int argc, char* argv[])
 
     SteamAPI_Shutdown();
 
+#if WIN32
     WSACleanup();
+#endif
 
-	return 0;
+    return 0;
 }

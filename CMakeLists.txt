@@ -24,22 +24,31 @@ if(NOT WIN32 AND NOT UNIX)
 endif()
 
 # Server Executable
+if(UNIX)
+    link_directories("3rdparty/steamworks_sdk_150/lib/linux64")
+endif()
+
 file(GLOB_RECURSE se-server_SRC "src/se-server/**.h" "src/se-server/**.cpp")
 add_executable(se-server ${se-server_SRC})
 GROUP_TARGET_SOURCE(se-server)
 
 if(WIN32)
 	target_link_libraries(se-server "../3rdparty/steamworks_sdk_150/lib/win64/steam_api64" ws2_32)
+elseif(UNIX)
+    target_link_libraries(se-server libsteam_api.so pthread)
 endif()
 
 # Copy Steamworks files to executable location.
 if(WIN32)
 	add_custom_command(TARGET se-server POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy "../3rdparty/steamworks_sdk_150/lib/win64/steam_api64.dll" $<TARGET_FILE_DIR:se-server>)
+    add_custom_command(TARGET se-server POST_BUILD
+    	COMMAND ${CMAKE_COMMAND} -E copy "../steam_appid.txt" $<TARGET_FILE_DIR:se-server>)
 elseif(UNIX)
 	add_custom_command(TARGET se-server POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy "../3rdparty/steamworks_sdk_150/lib/win64/libsteam_api.so" $<TARGET_FILE_DIR:se-server>)
+		COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/3rdparty/steamworks_sdk_150/lib/linux64/libsteam_api.so" $<TARGET_FILE_DIR:se-server>)
+    add_custom_command(TARGET se-server POST_BUILD
+    	COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/steam_appid.txt" $<TARGET_FILE_DIR:se-server>)
 endif()
 
-add_custom_command(TARGET se-server POST_BUILD
-	COMMAND ${CMAKE_COMMAND} -E copy "../steam_appid.txt" $<TARGET_FILE_DIR:se-server>)
+

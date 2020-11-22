@@ -3,20 +3,16 @@
 #if WIN32
 #include <WS2tcpip.h>
 #include <intrin.h>
+#else
+#include <arpa/inet.h>
 #endif
 
 std::string NetworkUtility::IPIntegerToString(uint32_t lAddress, bool bSwapEndianness)
 {
+    // lAddress is in host byte order.
     struct sockaddr_in sa;
     sa.sin_family = AF_INET;
-    sa.sin_addr.s_addr = lAddress;
-
-    if (bSwapEndianness)
-    {
-#if WIN32
-        sa.sin_addr.s_addr = _byteswap_ulong(lAddress);
-#endif
-    }
+    sa.sin_addr.s_addr = htonl(lAddress);
 
     char str[INET_ADDRSTRLEN];
 
@@ -47,4 +43,15 @@ void NetworkUtility::HexDump(void* pData, uint32_t lLength)
 void NetworkUtility::IPStringToSockAddrIn(const std::string& strIP, sockaddr_in* sockAddr)
 {
     inet_pton(AF_INET, strIP.c_str(), &sockAddr->sin_addr);
+}
+
+bool NetworkUtility::IsPlatformBigEndian()
+{
+    union
+    {
+        uint32_t i;
+        char c[4];
+    } bint = {0x01020304};
+
+    return bint.c[0] == 1;
 }
