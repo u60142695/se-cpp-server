@@ -41,7 +41,7 @@ bool NetworkInterface::Initialize()
 
     // Set Non Blocking
 #if WIN32
-    u_long lMode = 1;
+    u_long lMode = 0;
     if (ioctlsocket(m_hUDPSocket, FIONBIO, &lMode) == SOCKET_ERROR)
     {
         sLog->Error("Failed to set UDP socket as non-blocking!");
@@ -69,7 +69,7 @@ bool NetworkInterface::Initialize()
     }
 
     // Init Steam.
-    if (!SteamGameServer_Init(0, 8766, 27016, MASTERSERVERUPDATERPORT_USEGAMESOCKETSHARE, eServerModeAuthenticationAndSecure, "1.196.019"))
+    if (!SteamGameServer_Init(0, 8766, 27016, MASTERSERVERUPDATERPORT_USEGAMESOCKETSHARE, eServerModeAuthenticationAndSecure, "1196019"))
     {
         sLog->Error("Failed to SteamGameServer_Init!");
         return false;
@@ -81,10 +81,6 @@ bool NetworkInterface::Initialize()
     SteamGameServer()->SetProduct("Space Engineers");
     SteamGameServer()->SetGameDescription("Space Engineers");
     SteamGameServer()->SetDedicatedServer(true);
-    SteamGameServer()->SetServerName("Development Server");
-    SteamGameServer()->SetMapName("DevMap0.1");
-    SteamGameServer()->SetGameTags("groupId0 version1196019 datahashshfAewLc3toqKgW0hnL+PVd+UoxH8= mods0 gamemodeS1-1-1-1 view3000");
-    SteamGameServer()->SetMaxPlayerCount(7);
 
     sLog->Info("Network Layer initialized.");
 
@@ -135,6 +131,12 @@ bool NetworkInterface::Start()
         m_aP2PReceiveChannels[i]->Start();
     }
 
+    SteamGameServer()->SetServerName("Development Server");
+    SteamGameServer()->SetMapName("DevMap0.1");
+    SteamGameServer()->SetGameTags("groupId0 version1196019 datahash mods0 gamemodeS1-1-1-1 view3000");
+    SteamGameServer()->SetGameData("1196019");
+    SteamGameServer()->SetMaxPlayerCount(7);
+
     SteamGameServer()->LogOnAnonymous();
     SteamGameServer()->EnableHeartbeats(true);
 
@@ -149,8 +151,8 @@ bool NetworkInterface::Start()
     sLog->Info("Connected to Steam!");
 
     // Create the Lobby.
-    SteamAPICall_t hSteamAPICall = SteamMatchmaking()->CreateLobby(k_ELobbyTypePublic, 7);
-    m_LobbyCreatedCallResult.Set(hSteamAPICall, this, &NetworkInterface::OnLobbyCreated);
+    //SteamAPICall_t hSteamAPICall = SteamMatchmaking()->CreateLobby(k_ELobbyTypePublic, 7);
+    //m_LobbyCreatedCallResult.Set(hSteamAPICall, this, &NetworkInterface::OnLobbyCreated);
 
     return true;
 }
@@ -189,7 +191,7 @@ void NetworkInterface::SteamCallbackThread()
 
     while (m_bSteamCallbackThreadContinue)
     {
-        SteamAPI_RunCallbacks();
+        //SteamAPI_RunCallbacks();
 
         SteamGameServer_RunCallbacks();
 

@@ -1,8 +1,6 @@
 #include "util/LogUtility.h"
 #include "network/NetworkInterface.h"
 
-#include <steam/steam_api.h>
-
 #if WIN32
 #include <winsock2.h>
 #endif
@@ -23,11 +21,11 @@ int main(int argc, char* argv[])
 #endif
 
     // Initialize Steam API.
-    if (!SteamAPI_Init())
+    /*if (!SteamAPI_Init())
     {
         sLog->Info("Failed to initialize Steam API!");
         return 1;
-    }
+    }*/
 
     if (!sNetworkInterface->Initialize())
         return 1;
@@ -51,7 +49,7 @@ int main(int argc, char* argv[])
     // Shutdown work.
     sNetworkInterface->Shutdown();
 
-    SteamAPI_Shutdown();
+    //SteamAPI_Shutdown();
 
 #if WIN32
     WSACleanup();
