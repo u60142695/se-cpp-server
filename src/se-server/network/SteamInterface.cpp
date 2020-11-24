@@ -3,6 +3,12 @@
 #include "../util/LogUtility.h"
 #include "../util/NetworkUtility.h"
 
+#include "p2p/ControlChannel.h"
+#include "p2p/GameEventChannel.h"
+#include "p2p/ProfilerDownloadChannel.h"
+#include "p2p/VoiceChatChannel.h"
+#include "p2p/WorldDownloadChannel.h"
+
 #if WIN32
 #include <WinSock2.h>
 #else
@@ -30,6 +36,24 @@ SteamInterface* SteamInterface::GetInstance()
     return ms_instance;
 }
 
+SteamInterface::SteamInterface()
+{
+    m_aP2PReceiveChannels[0] = new ControlChannel();
+    m_aP2PReceiveChannels[1] = new WorldDownloadChannel();
+    m_aP2PReceiveChannels[2] = new GameEventChannel();
+    m_aP2PReceiveChannels[3] = new VoiceChatChannel();
+    m_aP2PReceiveChannels[4] = new ProfilerDownloadChannel();
+}
+
+SteamInterface::~SteamInterface()
+{
+    delete ((ControlChannel*)m_aP2PReceiveChannels[0]);
+    delete ((WorldDownloadChannel*)m_aP2PReceiveChannels[1]);
+    delete ((GameEventChannel*)m_aP2PReceiveChannels[2]);
+    delete ((VoiceChatChannel*)m_aP2PReceiveChannels[3]);
+    delete ((ProfilerDownloadChannel*)m_aP2PReceiveChannels[4]);
+}
+
 bool SteamInterface::Initialize()
 {
     sLog->Info("Initializing Steam Interface ...");
@@ -43,7 +67,7 @@ bool SteamInterface::Initialize()
         return false;
     }
 
-    // Set Blocking
+    // Set UDP Socket Blocking
 #if WIN32
     u_long lMode = 0;
     if (ioctlsocket(m_hUDPSocket, FIONBIO, &lMode) == SOCKET_ERROR)
@@ -123,10 +147,10 @@ bool SteamInterface::Start()
         });
 
     // Start the P2P Receive Channels.
-    /*for (char i = 0; i < 5; i++)
+    for (char i = 0; i < 5; i++)
     {
         m_aP2PReceiveChannels[i]->Start();
-    }*/
+    }
 
     SteamGameServer()->SetServerName("Development Server");
     SteamGameServer()->SetMapName("DevMap0.1");
@@ -151,10 +175,10 @@ bool SteamInterface::Start()
 
 void SteamInterface::Stop()
 {
-    /*for (char i = 0; i < 5; i++)
+    for (char i = 0; i < 5; i++)
     {
         m_aP2PReceiveChannels[i]->Stop();
-    }*/
+    }
 
     if (m_pSteamCallbackThread)
     {
@@ -181,24 +205,9 @@ void SteamInterface::SteamCallbackThread()
 {
     m_bSteamCallbackThreadContinue = true;
 
-    //SteamAPI_ManualDispatch_Init();
-    //HSteamPipe serverPipe = SteamGameServer_GetHSteamPipe();
-
     while (m_bSteamCallbackThreadContinue)
     {
-        SteamAPI_RunCallbacks();
         SteamGameServer_RunCallbacks();
-
-        /*SteamAPI_ManualDispatch_RunFrame(serverPipe);
-
-        CallbackMsg_t cbMsg;
-        while (SteamAPI_ManualDispatch_GetNextCallback(serverPipe, &cbMsg))
-        {
-            // Process Callback.
-            sLog->Info("Recv Callback %d", cbMsg.m_iCallback);
-
-            SteamAPI_ManualDispatch_FreeLastCallback(serverPipe);
-        }*/
 
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
@@ -224,8 +233,8 @@ void SteamInterface::UDPReceiveThread()
             // if this packet starts with 0xFFFFFFFF, forward it to Steam interface.
             if (recv > 4 && *((uint32_t*)m_aUDPBuffer) == 0xFFFFFFFF)
             {
-                sLog->Info("Forwarding Steam Packet from %s:%d size = %d", NetworkUtility::IPIntegerToString(ntohl(from.sin_addr.s_addr)).c_str(), ntohs(from.sin_port), recv);
-                NetworkUtility::HexDump(m_aUDPBuffer, recv);
+                sLog->Info("[STEAM] Forwarding Steam Packet from %s:%d size = %d", NetworkUtility::IPIntegerToString(ntohl(from.sin_addr.s_addr)).c_str(), ntohs(from.sin_port), recv);
+                //NetworkUtility::HexDump(m_aUDPBuffer, recv);
 
                 SteamGameServer()->HandleIncomingPacket(m_aUDPBuffer, recv, ntohl(from.sin_addr.s_addr), ntohs(from.sin_port));
 
@@ -236,8 +245,8 @@ void SteamInterface::UDPReceiveThread()
                 uint16_t sendPort = 0;
                 while ((sendSize = SteamGameServer()->GetNextOutgoingPacket(sendBuffer, 16 * 1024, &sendIP, &sendPort)) != 0)
                 {
-                    sLog->Info("Found Steam Packet to forward to %s:%d size=%d", NetworkUtility::IPIntegerToString(sendIP).c_str(), sendPort, sendSize);
-                    NetworkUtility::HexDump(sendBuffer, sendSize);
+                    sLog->Info("[STEAM] Found Steam Packet to forward to %s:%d size=%d", NetworkUtility::IPIntegerToString(sendIP).c_str(), sendPort, sendSize);
+                    //NetworkUtility::HexDump(sendBuffer, sendSize);
 
                     sockaddr_in dst;
                     dst.sin_family = AF_INET;
@@ -254,7 +263,7 @@ void SteamInterface::UDPReceiveThread()
             }
             else
             {
-                sLog->Info("Received %d unknown bytes from UDP Socket", recv);
+                sLog->Info("[NET] Received %d unknown bytes from UDP Socket", recv);
                 NetworkUtility::HexDump(m_aUDPBuffer, recv);
             }
         }
@@ -276,4 +285,16 @@ void SteamInterface::OnSteamServersDisconnected(SteamServersDisconnected_t* pCal
 void SteamInterface::OnSteamServerConnectFailure(SteamServerConnectFailure_t* pCallback)
 {
     sLog->Info("Failed to connect to Steam Network.");
+}
+
+void SteamInterface::OnP2PSessionRequest(P2PSessionRequest_t* pCallback)
+{
+    sLog->Info("P2P Session Request from %llu", pCallback->m_steamIDRemote.ConvertToUint64());
+
+    SteamGameServerNetworking()->AcceptP2PSessionWithUser(pCallback->m_steamIDRemote);
+}
+
+void SteamInterface::OnP2PSessionConnectFail(P2PSessionConnectFail_t* pCallback)
+{
+    sLog->Info("P2P Connect Failed");
 }
