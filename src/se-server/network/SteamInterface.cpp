@@ -1,4 +1,4 @@
-#include "NetworkInterface.h"
+#include "SteamInterface.h"
 
 #include "../util/LogUtility.h"
 #include "../util/NetworkUtility.h"
@@ -11,24 +11,28 @@
 #include <unistd.h>
 #endif
 
-NetworkInterface* sNetworkInterface = nullptr;
+SteamInterface* SteamInterface::ms_instance = nullptr;
 
-NetworkInterface::NetworkInterface()
+SteamInterface* SteamInterface::GetInstance()
 {
-    for (char i = 0; i < 5; i++)
+    if (!ms_instance)
     {
-        m_aP2PReceiveChannels[i] = new P2PReceiveChannel(i);
-    }    
+        // Initialize Steam.
+        if (!SteamGameServer_Init(0, 8766, 27016, MASTERSERVERUPDATERPORT_USEGAMESOCKETSHARE, eServerModeAuthenticationAndSecure, "1196019"))
+        {
+            sLog->Error("Failed to SteamGameServer_Init!");
+            return nullptr;
+        }
+
+        ms_instance = new SteamInterface();
+    }
+
+    return ms_instance;
 }
 
-NetworkInterface::~NetworkInterface()
+bool SteamInterface::Initialize()
 {
-    Shutdown();
-}
-
-bool NetworkInterface::Initialize()
-{
-    sLog->Info("Initializing Network Layer ...");
+    sLog->Info("Initializing Steam Interface ...");
 
     // Create UDP Socket.
     m_hUDPSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -39,7 +43,7 @@ bool NetworkInterface::Initialize()
         return false;
     }
 
-    // Set Non Blocking
+    // Set Blocking
 #if WIN32
     u_long lMode = 0;
     if (ioctlsocket(m_hUDPSocket, FIONBIO, &lMode) == SOCKET_ERROR)
@@ -68,19 +72,19 @@ bool NetworkInterface::Initialize()
         return false;
     }
 
-    m_bInitialized = true;
-
     SteamGameServer()->SetModDir("Space Engineers");
     SteamGameServer()->SetProduct("Space Engineers");
     SteamGameServer()->SetGameDescription("Space Engineers");
     SteamGameServer()->SetDedicatedServer(true);
 
-    sLog->Info("Network Layer initialized.");
+    sLog->Info("Steam Interface initialized.");
+
+    m_bInitialized = true;    
 
     return true;
 }
 
-void NetworkInterface::Shutdown()
+void SteamInterface::Shutdown()
 {
     if (m_bInitialized)
     {
@@ -96,7 +100,7 @@ void NetworkInterface::Shutdown()
     }
 }
 
-bool NetworkInterface::Start()
+bool SteamInterface::Start()
 {
     if (!m_bInitialized)
     {
@@ -106,23 +110,23 @@ bool NetworkInterface::Start()
 
     // Start the UDP Receive Thread.
     m_pUDPReceiveThread = new std::thread([this]()
-    {
-        UDPReceiveThread();
-    });
+        {
+            UDPReceiveThread();
+        });
 
     sLog->Info("Connecting to Steam ...");
 
     // Start the callbacks thread.
     m_pSteamCallbackThread = new std::thread([this]()
-    {
-        SteamCallbackThread();
-    });
+        {
+            SteamCallbackThread();
+        });
 
     // Start the P2P Receive Channels.
-    for (char i = 0; i < 5; i++)
+    /*for (char i = 0; i < 5; i++)
     {
         m_aP2PReceiveChannels[i]->Start();
-    }
+    }*/
 
     SteamGameServer()->SetServerName("Development Server");
     SteamGameServer()->SetMapName("DevMap0.1");
@@ -141,17 +145,16 @@ bool NetworkInterface::Start()
 
     std::string strPublicIP = NetworkUtility::IPIntegerToString(SteamGameServer()->GetPublicIP().m_unIPv4, true);
     sLog->Info("Public IP is %s - Steam ID: %llu", strPublicIP.c_str(), SteamGameServer()->GetSteamID().ConvertToUint64());
-    sLog->Info("Connected to Steam!");
 
     return true;
 }
 
-void NetworkInterface::Stop()
+void SteamInterface::Stop()
 {
-    for (char i = 0; i < 5; i++)
+    /*for (char i = 0; i < 5; i++)
     {
         m_aP2PReceiveChannels[i]->Stop();
-    }
+    }*/
 
     if (m_pSteamCallbackThread)
     {
@@ -174,7 +177,7 @@ void NetworkInterface::Stop()
     }
 }
 
-void NetworkInterface::SteamCallbackThread()
+void SteamInterface::SteamCallbackThread()
 {
     m_bSteamCallbackThreadContinue = true;
 
@@ -183,7 +186,7 @@ void NetworkInterface::SteamCallbackThread()
 
     while (m_bSteamCallbackThreadContinue)
     {
-        //SteamAPI_RunCallbacks();
+        SteamAPI_RunCallbacks();
         SteamGameServer_RunCallbacks();
 
         /*SteamAPI_ManualDispatch_RunFrame(serverPipe);
@@ -201,7 +204,7 @@ void NetworkInterface::SteamCallbackThread()
     }
 }
 
-void NetworkInterface::UDPReceiveThread()
+void SteamInterface::UDPReceiveThread()
 {
     m_bUDPReceiveThreadContinue = true;
 
@@ -216,7 +219,7 @@ void NetworkInterface::UDPReceiveThread()
 
         int recv = recvfrom(m_hUDPSocket, m_aUDPBuffer, 4096, 0, reinterpret_cast<sockaddr*>(&from), &fromlen);
 
-        if(recv > 0)
+        if (recv > 0)
         {
             // if this packet starts with 0xFFFFFFFF, forward it to Steam interface.
             if (recv > 4 && *((uint32_t*)m_aUDPBuffer) == 0xFFFFFFFF)
@@ -260,32 +263,17 @@ void NetworkInterface::UDPReceiveThread()
     }
 }
 
-void NetworkInterface::OnP2PSessionRequest(P2PSessionRequest_t* pData)
+void SteamInterface::OnSteamServersConnected(SteamServersConnected_t* pCallback)
 {
-    sLog->Info("P2P Session Request received from %llu", pData->m_steamIDRemote.ConvertToUint64());
+    sLog->Info("Connected to Steam Network.");
 }
 
-void NetworkInterface::OnP2PSessionConnectFail(P2PSessionConnectFail_t* pData)
+void SteamInterface::OnSteamServersDisconnected(SteamServersDisconnected_t* pCallback)
 {
-    sLog->Info("P2P Session connect failed steamid %llu error %d", pData->m_steamIDRemote.ConvertToUint64(), pData->m_eP2PSessionError);
+    sLog->Info("Disconnected from Steam Network.");
 }
 
-void NetworkInterface::OnGSClientApprove(GSClientApprove_t* pData)
+void SteamInterface::OnSteamServerConnectFailure(SteamServerConnectFailure_t* pCallback)
 {
-    sLog->Info("GS client approved");
-}
-
-void NetworkInterface::OnGSClientDeny(GSClientDeny_t* pData)
-{
-    sLog->Info("GS client deny");
-} 
-
-void NetworkInterface::OnGSClientGroupStatus(GSClientGroupStatus_t* pData)
-{
-    sLog->Info("GS client group status");
-}
-
-void NetworkInterface::OnGSClientKick(GSClientKick_t* pData)
-{
-    sLog->Info("GS client kick");
+    sLog->Info("Failed to connect to Steam Network.");
 }

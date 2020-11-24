@@ -1,5 +1,7 @@
 #include "util/LogUtility.h"
-#include "network/NetworkInterface.h"
+#include "network/SteamInterface.h"
+
+#include <string>
 
 #if WIN32
 #include <winsock2.h>
@@ -16,23 +18,22 @@ int main(int argc, char* argv[])
     if (wsaError != 0)
     {
         sLog->Error("WSAStartup failed with error %d", wsaError);
-        return false;
+        return 1;
     }
 #endif
 
-    // Initialize Steam API.
-    /*if (!SteamAPI_Init())
+    if (!SteamInterface::GetInstance()->Initialize())
     {
-        sLog->Info("Failed to initialize Steam API!");
+        sLog->Error("Steam Interface init failed, exiting");
         return 1;
-    }*/
+    }
 
-    if (!sNetworkInterface->Initialize())
+    if (!SteamInterface::GetInstance()->Start())
+    {
+        sLog->Error("Steam Interface start failed, exiting");
         return 1;
-
-    if (!sNetworkInterface->Start())
-        return 1;
-    
+    }
+        
     bool bContinue = true;
     std::string strLine;
     while (bContinue)
@@ -47,9 +48,7 @@ int main(int argc, char* argv[])
     }
 
     // Shutdown work.
-    sNetworkInterface->Shutdown();
-
-    //SteamAPI_Shutdown();
+    SteamInterface::GetInstance()->Shutdown();
 
 #if WIN32
     WSACleanup();
