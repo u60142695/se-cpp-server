@@ -1,6 +1,6 @@
 #include "VoiceChatChannel.h"
 
-VoiceChatChannel::VoiceChatChannel() : IP2PChannel(kP2PChannelId_VoiceChat)
+VoiceChatChannel::VoiceChatChannel() : IP2PChannel(eP2PChannelId::VoiceChat)
 {
 
 }

@@ -6,17 +6,29 @@
 
 #include "../../player/PlayerManager.h"
 
-GameEventChannel::GameEventChannel() : IP2PChannel(kP2PChannelId_GameEvent)
+GameEventChannel::GameEventChannel() : IP2PChannel(eP2PChannelId::GameEvent)
 {
 
 }
 
+void GameEventChannel::SendJoinResult(uint64_t steamId, eJoinResult eResult)
+{
+    P2PPacket pkt(SE_MESSAGE_ID_JOIN_RESULT);
+
+    pkt.bitStream.WriteUInt64(0); // adminId
+    // write enum
+    pkt.bitStream.WriteUInt64((uint64_t)eResult, (int)((std::log((int)eJoinResult::Enum_Max - 1) / std::log(2))) + 1);
+    pkt.bitStream.WriteBoolean(false); // experimental mode
+
+    SendPacket(steamId, pkt);
+    // ulong:admin
+    // joinresult:joinresult
+    // bool:server_experimental
+}
+
 void GameEventChannel::HandlePacket(P2PPacket* pkt)
 {
-    uint8_t opcode = pkt->bitStream.ReadUInt8();
-    uint8_t receiverIndex = pkt->bitStream.ReadUInt8();
-
-    if (opcode == 14) // CLIENT_CONNECTED. This is the initial packet sent by the game client.
+    if (pkt->messageId == SE_MESSAGE_ID_CLIENT_CONNECTED) // CLIENT_CONNECTED. This is the initial packet sent by the game client.
     {
         bool bExperimentalMode = pkt->bitStream.ReadBoolean();
         bool bIsAdmin = pkt->bitStream.ReadBoolean();
@@ -50,7 +62,7 @@ void GameEventChannel::HandlePacket(P2PPacket* pkt)
     }
     else
     {
-        sLog->Info("Received Game Event Packet Opcode=%d RecvIndex=%d Size=%d", opcode, receiverIndex, pkt->bitStream.GetByteLength());
+        sLog->Info("Received unknown Game Event Packet Opcode=%d RecvIndex=%d Size=%d", pkt->messageId, pkt->receiverIndex, pkt->bitStream.GetByteLength());
         NetworkUtility::HexDump(pkt->bitStream.GetBuffer(), pkt->bitStream.GetByteLength());
     }    
 }

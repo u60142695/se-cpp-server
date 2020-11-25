@@ -28,8 +28,6 @@ void PlayerManager::BeginAuthenticate(uint64_t steamId, const std::string& userN
     }
     else
     {
-        // Check bans.
-
         // Send Ticket Validation Request to Steam.
         auto result = SteamGameServer()->BeginAuthSession(token.get(), tokenLength, CSteamID(steamId));
         if (result != k_EBeginAuthSessionResultOK)
@@ -67,6 +65,9 @@ void PlayerManager::EndAuthenticate(uint64_t steamId, int steamResult)
     if (steamResult != k_EAuthSessionResponseOK)
     {
         sLog->Info("Steam Authentication failed for %llu", steamId);
+
+        SteamInterface::GetInstance()->GetGameEventChannel()->SendJoinResult(steamId, eJoinResult::TicketInvalid);
+
         return;
     }
 
@@ -79,4 +80,6 @@ void PlayerManager::EndAuthenticate(uint64_t steamId, int steamResult)
         m_players.insert(std::make_pair(pPlayer->GetSteamId(), pPlayer));
     }
     m_mtxPlayers.unlock();
+
+    SteamInterface::GetInstance()->GetGameEventChannel()->SendJoinResult(steamId, eJoinResult::ServerFull);
 }

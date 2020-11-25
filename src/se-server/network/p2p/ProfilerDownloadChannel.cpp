@@ -1,6 +1,6 @@
 #include "ProfilerDownloadChannel.h"
 
-ProfilerDownloadChannel::ProfilerDownloadChannel() : IP2PChannel(kP2PChannelId_ProfilerDownload)
+ProfilerDownloadChannel::ProfilerDownloadChannel() : IP2PChannel(eP2PChannelId::ProfilerDownload)
 {
 
 }

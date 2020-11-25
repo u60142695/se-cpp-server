@@ -4,8 +4,8 @@
 #include "P2PPacket.h"
 #include "../../util/Crc32.h"
 
-IP2PChannel::IP2PChannel(int32_t lChannelId)
-: m_lChannelId(lChannelId)
+IP2PChannel::IP2PChannel(eP2PChannelId channelId)
+: m_eChannelId(channelId)
 {
     memset(m_aReceiveBuffer, 0, RECEIVE_BUFFER_SIZE);
 }
@@ -36,22 +36,34 @@ void IP2PChannel::Stop()
     }
 }
 
+void IP2PChannel::SendPacket(uint64_t steamId, P2PPacket& pkt)
+{
+    if (!pkt.reliable)
+    {
+        // write crc32
+    }
+
+    SteamGameServerNetworking()->SendP2PPacket(CSteamID(steamId), pkt.bitStream.GetBuffer(), pkt.bitStream.GetBytePosition(),
+        pkt.reliable ? k_EP2PSendReliableWithBuffering : k_EP2PSendUnreliable, (int)m_eChannelId);
+}
+
 void IP2PChannel::ReceiveThread()
 {
     m_bReceiveThreadContinue = true;
 
+    int lChannelId = (int)m_eChannelId;
     while (m_bReceiveThreadContinue)
     {
         uint32_t pktLength = 0;
         uint32_t pktLength2 = 0;
-        if (SteamGameServerNetworking()->IsP2PPacketAvailable(&pktLength, m_lChannelId))
+        if (SteamGameServerNetworking()->IsP2PPacketAvailable(&pktLength, lChannelId))
         {
             CSteamID remoteSteamId;
-            if (SteamGameServerNetworking()->ReadP2PPacket(m_aReceiveBuffer, pktLength, &pktLength2, &remoteSteamId, m_lChannelId))
+            if (SteamGameServerNetworking()->ReadP2PPacket(m_aReceiveBuffer, pktLength, &pktLength2, &remoteSteamId, lChannelId))
             {
                 if (pktLength2 >= 8)
                 {
-                    sLog->Info("[P2P] Packet available on channel %d from %llu size = %d", m_lChannelId, remoteSteamId.ConvertToUint64(), pktLength2);
+                    sLog->Info("[P2P] Packet available on channel %d from %llu size = %d", lChannelId, remoteSteamId.ConvertToUint64(), pktLength2);
 
                     if (m_aReceiveBuffer[7] > 1)
                     {
@@ -60,11 +72,11 @@ void IP2PChannel::ReceiveThread()
                     else
                     {
                         P2PPacket pkt;
+                        pkt.bitStream.ResetRead(m_aReceiveBuffer + 8, (pktLength2 - 8) * 8); // skip header for now.
 
-                        pkt.messageId = m_aReceiveBuffer[8];
+                        pkt.messageId = pkt.bitStream.ReadUInt8();
+                        pkt.receiverIndex = pkt.bitStream.ReadUInt8();
                         pkt.remoteSteamID = remoteSteamId.ConvertToUint64();
-                        pkt.bitStream.ResetRead(m_aReceiveBuffer + 8, (pktLength2 - 8) * 8);
-                        pkt.buffer.Append(m_aReceiveBuffer + 8, pktLength2 - 8);
 
                         this->HandlePacket(&pkt);
                     }

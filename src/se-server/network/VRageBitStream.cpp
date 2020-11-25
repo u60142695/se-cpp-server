@@ -42,6 +42,11 @@ uint64_t* VRageBitStream::GetBuffer()
     return m_buffer;
 }
 
+void VRageBitStream::SetBytePosition(uint32_t position)
+{
+    m_bitPosition = position * 8;
+}
+
 bool VRageBitStream::OwnsBuffer()
 {
     return m_ownedBuffer == m_buffer;
@@ -173,6 +178,11 @@ bool VRageBitStream::ReadBoolean()
     return readInternal(1) > 0;
 }
 
+void VRageBitStream::WriteBoolean(bool value)
+{
+    writeInternal(value ? ULLONG_MAX : 0, 1);
+}
+
 void VRageBitStream::ReadMemory(void* ptr, int bitSize)
 {
     int numLongs = bitSize / 8 / 8;
@@ -188,6 +198,24 @@ void VRageBitStream::ReadMemory(void* ptr, int bitSize)
         int readBits = std::min(remainingBits, 8);
         *bptr = ReadUInt8(readBits);
         remainingBits -= readBits;
+        bptr++;
+    }
+}
+
+void VRageBitStream::WriteMemory(void* ptr, int bitSize)
+{
+    int numLongs = bitSize / 8 / 8;
+    for (int i = 0; i < numLongs; i++)
+    {
+        WriteUInt64((uint64_t) *((int64_t*)((uint8_t*)ptr + i * 8)), 64);
+    }
+    int remainingBits = bitSize - numLongs * 8 * 8;
+    uint8_t* bptr = (uint8_t*)ptr + numLongs * 8;
+    while (remainingBits > 0)
+    {
+        int writeBits = std::min(remainingBits, 8);
+        WriteUInt8(*bptr, writeBits);
+        remainingBits -= writeBits;
         bptr++;
     }
 }
@@ -212,6 +240,15 @@ std::string VRageBitStream::ReadString()
     return str;
 }
 
+void VRageBitStream::WriteString(const std::string& str)
+{
+    WriteBoolean(true);
+
+    WriteUInt32Variant(str.length());
+
+    this->WriteMemory((void*)str.c_str(), str.length() * 8);
+}
+
 int8_t VRageBitStream::ReadInt8(int bitCount)
 {
     return (int8_t)readInternal(bitCount);
@@ -222,6 +259,26 @@ uint8_t VRageBitStream::ReadUInt8(int bitCount)
     return (uint8_t)readInternal(bitCount);
 }
 
+int16_t VRageBitStream::ReadInt16(int bitCount)
+{
+    return (int16_t)readInternal(bitCount);
+}
+
+uint16_t VRageBitStream::ReadUInt16(int bitCount)
+{
+    return (uint16_t)readInternal(bitCount);
+}
+
+int32_t VRageBitStream::ReadInt32(int bitCount)
+{
+    return (int32_t)readInternal(bitCount);
+}
+
+uint32_t VRageBitStream::ReadUInt32(int bitCount)
+{
+    return (uint32_t)readInternal(bitCount);
+}
+
 int64_t VRageBitStream::ReadInt64(int bitCount)
 {
     return (long)readInternal(bitCount);
@@ -230,6 +287,46 @@ int64_t VRageBitStream::ReadInt64(int bitCount)
 uint64_t VRageBitStream::ReadUInt64(int bitCount)
 {
     return readInternal(bitCount);
+}
+
+void VRageBitStream::WriteInt8(int8_t value, int bitCount)
+{
+    writeInternal((uint64_t)((int64_t)value), bitCount);
+}
+
+void VRageBitStream::WriteUInt8(uint8_t value, int bitCount)
+{
+    writeInternal((uint64_t)value, bitCount);
+}
+
+void VRageBitStream::WriteInt16(int16_t value, int bitCount)
+{
+    writeInternal((uint64_t)((int64_t)value), bitCount);
+}
+
+void VRageBitStream::WriteUInt16(uint16_t value, int bitCount)
+{
+    writeInternal((uint64_t)value, bitCount);
+}
+
+void VRageBitStream::WriteInt32(int32_t value, int bitCount)
+{
+    writeInternal((uint64_t)((int64_t)value), bitCount);
+}
+
+void VRageBitStream::WriteUInt32(uint32_t value, int bitCount)
+{
+    writeInternal((uint64_t)value, bitCount);
+}
+
+void VRageBitStream::WriteInt64(int64_t value, int bitCount)
+{
+    writeInternal((uint64_t)((int64_t)value), bitCount);
+}
+
+void VRageBitStream::WriteUInt64(uint64_t value, int bitCount)
+{
+    writeInternal((uint64_t)value, bitCount);
 }
 
 int32_t VRageBitStream::ReadInt32Variant()
@@ -319,6 +416,43 @@ uint64_t VRageBitStream::ReadUInt64Variant()
     return value;
 }
 
+void VRageBitStream::WriteUInt32Variant(uint32_t value)
+{
+    uint64_t value2;
+    uint8_t* ptr = (uint8_t*)&value2;
+    int num = 0;
+    int num2 = 0;
+    do
+    {
+        ptr[num2++] = (uint8_t)(value | 128);
+        num++;
+    } while ((value >>= 7) != 0);
+    uint8_t* ptr2 = ptr + (num2 - 1);
+    *ptr2 &= 127;
+    writeInternal(value2, num * 8);
+}
+
+void VRageBitStream::WriteUInt64Variant(uint64_t value)
+{
+    uint8_t ptr[16];
+    int num = 0;
+    int num2 = 0;
+    do
+    {
+        ptr[num2++] = (uint8_t)((value & 127) | 128);
+        num++;
+    } while ((value >> 7) != 0);
+    uint8_t* ptr2 = ptr + (num2 - 1);
+    *ptr2 &= 127;
+    if (num > 8)
+    {
+        writeInternal((uint64_t)(*(int64_t*)ptr), 64);
+        writeInternal((uint64_t)(*(int64_t*)(ptr + 8)), (num - 8) * 8);
+        return;
+    }
+    writeInternal((uint64_t)(*(int64_t*)ptr), num * 8);
+}
+
 int VRageBitStream::getDivisionCeil(int num, int div)
 {
     return (num - 1) / div + 1;
@@ -363,6 +497,28 @@ uint64_t VRageBitStream::readInternal(int bitSize)
     }
     m_bitPosition += bitSize;
     return value & basemask;
+}
+
+void VRageBitStream::writeInternal(uint64_t value, int bitSize)
+{
+    if (bitSize == 0)
+        return;
+
+    ensureSize(m_bitPosition + bitSize);
+
+    int longOffsetStart = m_bitPosition >> 6;
+    int longOffsetEnd = m_bitPosition + bitSize - 1 >> 6;
+    uint64_t basemask = ULLONG_MAX >> 64 - bitSize;
+    int placeOffset = m_bitPosition & 63;
+    value &= basemask;
+    m_buffer[longOffsetStart] &= ~(basemask << placeOffset);
+    m_buffer[longOffsetStart] |= value << placeOffset;
+    if (longOffsetEnd != longOffsetStart)
+    {
+        m_buffer[longOffsetEnd] &= ~(basemask >> 64 - placeOffset);
+        m_buffer[longOffsetEnd] |= value >> 64 - placeOffset;
+    }
+    m_bitPosition += bitSize;
 }
 
 int VRageBitStream::zag(uint32_t ziggedValue)

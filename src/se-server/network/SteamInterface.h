@@ -2,7 +2,8 @@
 #define STEAM_INTERFACE_H
 
 #include <steam/steam_gameserver.h>
-#include "p2p/IP2PChannel.h"
+
+#include "p2p/GameEventChannel.h"
 
 class SteamInterface
 {
@@ -12,14 +13,16 @@ public:
     SteamInterface();
     ~SteamInterface();
 
-    bool            Initialize();
-    void            Shutdown();
+    bool                Initialize();
+    void                Shutdown();
 
-    bool            Start();
-    void            Stop();
+    bool                Start();
+    void                Stop();
+
+    GameEventChannel*   GetGameEventChannel();
 private:
-    void            SteamCallbackThread();
-    void            UDPReceiveThread();
+    void                SteamCallbackThread();
+    void                UDPReceiveThread();
 private:
     // Callbacks
     STEAM_GAMESERVER_CALLBACK(SteamInterface, OnSteamServersConnected, SteamServersConnected_t);

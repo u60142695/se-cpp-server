@@ -1,6 +1,6 @@
 #include "ControlChannel.h"
 
-ControlChannel::ControlChannel() : IP2PChannel(kP2PChannelId_Control)
+ControlChannel::ControlChannel() : IP2PChannel(eP2PChannelId::Control)
 {
 
 }

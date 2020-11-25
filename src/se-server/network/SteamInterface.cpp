@@ -203,6 +203,11 @@ void SteamInterface::Stop()
     }
 }
 
+GameEventChannel* SteamInterface::GetGameEventChannel()
+{
+    return (GameEventChannel*)m_aP2PReceiveChannels[(uint32_t)eP2PChannelId::GameEvent];
+}
+
 void SteamInterface::SteamCallbackThread()
 {
     m_bSteamCallbackThreadContinue = true;
