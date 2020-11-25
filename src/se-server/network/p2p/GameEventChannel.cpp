@@ -4,6 +4,8 @@
 #include "../../util/NetworkUtility.h"
 #include "../../util/CPP20Util.h"
 
+#include "../../player/PlayerManager.h"
+
 GameEventChannel::GameEventChannel() : IP2PChannel(kP2PChannelId_GameEvent)
 {
 
@@ -24,8 +26,19 @@ void GameEventChannel::HandlePacket(P2PPacket* pkt)
         std::string userName = pkt->bitStream.ReadString();
         uint64_t steamId = pkt->bitStream.ReadUInt64();
 
+        if (steamId != pkt->remoteSteamID)
+        {
+            sLog->Error("Received authentication for %llu from different steam remote %llu - hack?", steamId, pkt->remoteSteamID);
+            // disconnect user?
+            return;
+        }
+
         // Read Token.
-        int tokenSize = pkt->bitStream.ReadUInt32Variant();
+        pkt->bitStream.ReadBoolean(); // array is nullable
+        uint32_t tokenSize = pkt->bitStream.ReadUInt32Variant();
+
+        sLog->Info("Token Size: %u", tokenSize);
+
         std::shared_ptr<char> tokenData = CPP20Util::MakeArray<char>(tokenSize);
         for (int i = 0; i < tokenSize; i++)
         {
@@ -33,6 +46,7 @@ void GameEventChannel::HandlePacket(P2PPacket* pkt)
         }
 
         sLog->Info("Client Connected: %llu (%s)", steamId, userName.c_str());
+        PlayerManager::GetInstance()->BeginAuthenticate(steamId, userName, bExperimentalMode, bIsProfiling, tokenData, tokenSize);
     }
     else
     {

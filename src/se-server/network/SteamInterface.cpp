@@ -9,6 +9,8 @@
 #include "p2p/VoiceChatChannel.h"
 #include "p2p/WorldDownloadChannel.h"
 
+#include "../player/PlayerManager.h"
+
 #if WIN32
 #include <WinSock2.h>
 #else
@@ -297,4 +299,9 @@ void SteamInterface::OnP2PSessionRequest(P2PSessionRequest_t* pCallback)
 void SteamInterface::OnP2PSessionConnectFail(P2PSessionConnectFail_t* pCallback)
 {
     sLog->Info("P2P Connect Failed");
+}
+
+void SteamInterface::OnValidateAuthTicketResponse(ValidateAuthTicketResponse_t* pCallback)
+{
+    PlayerManager::GetInstance()->EndAuthenticate(pCallback->m_SteamID.ConvertToUint64(), pCallback->m_eAuthSessionResponse);
 }

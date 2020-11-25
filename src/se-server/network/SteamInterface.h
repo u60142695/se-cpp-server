@@ -28,6 +28,8 @@ private:
 
     STEAM_GAMESERVER_CALLBACK(SteamInterface, OnP2PSessionRequest, P2PSessionRequest_t);
     STEAM_GAMESERVER_CALLBACK(SteamInterface, OnP2PSessionConnectFail, P2PSessionConnectFail_t);
+
+    STEAM_GAMESERVER_CALLBACK(SteamInterface, OnValidateAuthTicketResponse, ValidateAuthTicketResponse_t);
 private:
     bool                m_bInitialized = false;
     // Steam Callback Thread
